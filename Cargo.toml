@@ -1,0 +1,15 @@
+[package]
+name = "machine_metrics"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = "0.5.16"
+sysinfo = "0.26.4"
+cncr_k_ltd_ring = { git = "https://github.com/Banyc/cncr_k_ltd_ring" }
+tokio = { version = "1.21.2", features = ["full"] }
+env_logger = "0.9.1"
+log = "0.4.17"
+serde = { version = "1.0.145", features = ["derive"] }
