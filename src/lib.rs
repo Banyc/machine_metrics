@@ -3,6 +3,9 @@ use std::collections::HashMap;
 use cncr_k_ltd_ring::CncrKLtdRing;
 use serde::{Deserialize, Serialize};
 
+pub mod api;
+pub mod metrics;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MetricPoint {
     pub timestamp: u64,
@@ -18,7 +21,7 @@ pub enum MetricName {
     NetRxUsage,
 }
 
-pub type Cache = CncrKLtdRing<MetricName, MetricPoint>;
+pub type MetricCache = CncrKLtdRing<MetricName, MetricPoint>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MetricsRequest {

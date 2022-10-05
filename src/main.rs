@@ -1,20 +1,8 @@
-use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-    sync::Arc,
-    time,
-};
+use std::{collections::HashSet, net::SocketAddr, sync::Arc, time};
 
-use axum::{
-    http::{Request, StatusCode},
-    middleware::{self, Next},
-    response::IntoResponse,
-    routing::post,
-    Json, Router,
-};
+use axum::{middleware, routing::post, Json, Router};
 use log::info;
-use machine_metrics::{Cache, MetricName, MetricPoint, MetricsRequest, MetricsResponse};
-use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
+use machine_metrics::{api, metrics, MetricCache};
 
 #[tokio::main]
 async fn main() {
@@ -22,7 +10,7 @@ async fn main() {
 
     let shard_count = 4;
     let ring_size = 1024;
-    let cache = Cache::new(shard_count, ring_size);
+    let cache = MetricCache::new(shard_count, ring_size);
     let cache = Arc::new(cache);
 
     let ethernet_name = "en0";
@@ -31,12 +19,12 @@ async fn main() {
     let api_tokens = HashSet::from_iter(api_tokens);
     let api_tokens = Arc::new(api_tokens);
 
-    let mut sys_info = get_new_sys_info();
+    let mut sys_info = metrics::get_new_sys_info();
     {
         let cache = Arc::clone(&cache);
         tokio::spawn(async move {
             loop {
-                sample_sys_info(&cache, &mut sys_info, &ethernet_name);
+                metrics::sample_sys_info(&cache, &mut sys_info, &ethernet_name);
                 tokio::time::sleep(time::Duration::from_secs(5)).await;
             }
         });
@@ -45,14 +33,10 @@ async fn main() {
     let api_token_required = Router::new()
         .route(
             "/get_machine_metrics/v1",
-            post(move |Json(req)| {
-                let cache = Arc::clone(&cache);
-                get_machine_metrics(req, Arc::clone(&cache))
-            }),
+            post(move |Json(req)| api::get_machine_metrics(req, Arc::clone(&cache))),
         )
         .layer(middleware::from_fn(move |req, next| {
-            let passwords = Arc::clone(&api_tokens);
-            api_token_auth(req, next, passwords)
+            api::api_token_auth(req, next, Arc::clone(&api_tokens))
         }));
 
     // build our application
@@ -66,123 +50,4 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
-}
-
-async fn api_token_auth<B>(
-    req: Request<B>,
-    next: Next<B>,
-    api_tokens: Arc<HashSet<String>>,
-) -> impl IntoResponse {
-    let auth_header = req.headers().get("Authorization");
-    if let Some(auth_header) = auth_header {
-        if let Ok(auth_header) = auth_header.to_str() {
-            if auth_header.starts_with("Bearer ") {
-                let token = &auth_header[7..];
-                if api_tokens.contains(token) {
-                    return next.run(req).await;
-                }
-            }
-        }
-    }
-    (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
-}
-
-async fn get_machine_metrics(req: MetricsRequest, cache: Arc<Cache>) -> impl IntoResponse {
-    let mut resp = MetricsResponse {
-        cpu: HashMap::new(),
-        cpus: cache
-            .clone_batch_last(&MetricName::CpusUsage, req.each_count)
-            .map_or(vec![], |v| v),
-        mem: cache
-            .clone_batch_last(&MetricName::MemUsage, req.each_count)
-            .map_or(vec![], |v| v),
-        net_tx: cache
-            .clone_batch_last(&MetricName::NetTxUsage, req.each_count)
-            .map_or(vec![], |v| v),
-        net_rx: cache
-            .clone_batch_last(&MetricName::NetRxUsage, req.each_count)
-            .map_or(vec![], |v| v),
-    };
-
-    let mut id = 0;
-    loop {
-        let metrics = match cache.clone_batch_last(&MetricName::CpuUsage { id }, req.each_count) {
-            Some(metrics) => metrics,
-            None => break,
-        };
-        resp.cpu.insert(id, metrics);
-        id = id + 1;
-    }
-
-    Json(resp)
-}
-
-fn get_new_sys_info() -> System {
-    let mut sys_info = System::new_all();
-    sys_info.refresh_all();
-    sys_info
-}
-
-fn sample_sys_info(cache: &Arc<Cache>, sys_info: &mut System, ethernet_interface_name: &str) {
-    sys_info.refresh_cpu();
-    sys_info.refresh_memory();
-    sys_info.refresh_networks();
-
-    let timestamp = time::SystemTime::now()
-        .duration_since(time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    let cpus_usage = sys_info.global_cpu_info().cpu_usage();
-    cache.push(
-        MetricName::CpusUsage,
-        MetricPoint {
-            timestamp,
-            value: cpus_usage as f64,
-        },
-    );
-
-    for (i, cpu) in sys_info.cpus().iter().enumerate() {
-        let usage = cpu.cpu_usage();
-        cache.push(
-            MetricName::CpuUsage { id: i },
-            MetricPoint {
-                timestamp,
-                value: usage as f64,
-            },
-        );
-    }
-
-    let mem_usage = sys_info.used_memory() as f64 / sys_info.total_memory() as f64;
-    cache.push(
-        MetricName::MemUsage,
-        MetricPoint {
-            timestamp,
-            value: mem_usage,
-        },
-    );
-
-    for (interface_name, data) in sys_info.networks() {
-        if interface_name != ethernet_interface_name {
-            continue;
-        }
-        let tx_bytes = data.transmitted();
-        cache.push(
-            MetricName::NetTxUsage,
-            MetricPoint {
-                timestamp,
-                value: tx_bytes as f64,
-            },
-        );
-
-        let rx_bytes = data.received();
-        cache.push(
-            MetricName::NetRxUsage,
-            MetricPoint {
-                timestamp,
-                value: rx_bytes as f64,
-            },
-        );
-        break;
-    }
 }
