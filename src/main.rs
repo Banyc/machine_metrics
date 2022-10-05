@@ -1,6 +1,17 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time};
+use std::{
+    collections::{HashMap, HashSet},
+    net::SocketAddr,
+    sync::Arc,
+    time,
+};
 
-use axum::{response::IntoResponse, routing::post, Json, Router};
+use axum::{
+    http::{Request, StatusCode},
+    middleware::{self, Next},
+    response::IntoResponse,
+    routing::post,
+    Json, Router,
+};
 use log::info;
 use machine_metrics::{Cache, MetricName, MetricPoint, MetricsRequest, MetricsResponse};
 use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
@@ -14,10 +25,13 @@ async fn main() {
     let cache = Cache::new(shard_count, ring_size);
     let cache = Arc::new(cache);
 
-    let mut sys_info = get_new_sys_info();
-
     let ethernet_name = "en0";
+    let api_tokens = vec!["unsafe".to_string()];
 
+    let api_tokens = HashSet::from_iter(api_tokens);
+    let api_tokens = Arc::new(api_tokens);
+
+    let mut sys_info = get_new_sys_info();
     {
         let cache = Arc::clone(&cache);
         tokio::spawn(async move {
@@ -28,14 +42,21 @@ async fn main() {
         });
     }
 
-    // build our application with a route
-    let app = Router::new().route(
-        "/api/v1/machine_metrics",
-        post({
-            let cache = Arc::clone(&cache);
-            move |Json(req)| get_machine_metrics(req, Arc::clone(&cache))
-        }),
-    );
+    let api_token_required = Router::new()
+        .route(
+            "/get_machine_metrics/v1",
+            post(move |Json(req)| {
+                let cache = Arc::clone(&cache);
+                get_machine_metrics(req, Arc::clone(&cache))
+            }),
+        )
+        .layer(middleware::from_fn(move |req, next| {
+            let passwords = Arc::clone(&api_tokens);
+            api_token_auth(req, next, passwords)
+        }));
+
+    // build our application
+    let app = Router::new().nest("/api_token", api_token_required);
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
@@ -45,6 +66,25 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+}
+
+async fn api_token_auth<B>(
+    req: Request<B>,
+    next: Next<B>,
+    api_tokens: Arc<HashSet<String>>,
+) -> impl IntoResponse {
+    let auth_header = req.headers().get("Authorization");
+    if let Some(auth_header) = auth_header {
+        if let Ok(auth_header) = auth_header.to_str() {
+            if auth_header.starts_with("Bearer ") {
+                let token = &auth_header[7..];
+                if api_tokens.contains(token) {
+                    return next.run(req).await;
+                }
+            }
+        }
+    }
+    (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
 }
 
 async fn get_machine_metrics(req: MetricsRequest, cache: Arc<Cache>) -> impl IntoResponse {
