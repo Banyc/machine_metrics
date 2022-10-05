@@ -1,4 +1,11 @@
-use std::{collections::HashSet, fs::File, io::Read, net::SocketAddr, sync::Arc, time};
+use std::{
+    collections::HashSet,
+    fs::File,
+    io::Read,
+    net::{SocketAddr, ToSocketAddrs},
+    sync::Arc,
+    time,
+};
 
 use axum::{middleware, routing::post, Json, Router};
 use log::info;
@@ -50,7 +57,12 @@ async fn main() {
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let addr: SocketAddr = config
+        .listen_addr
+        .to_socket_addrs()
+        .unwrap()
+        .next()
+        .unwrap();
     info!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
@@ -66,6 +78,7 @@ pub struct ApiToken {
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub listen_addr: String,
     pub shard_count: usize,
     pub ring_size: usize,
     pub ethernet_name: String,
