@@ -23,22 +23,22 @@ pub fn sample_sys_info(
         .unwrap()
         .as_secs();
 
-    let cpus_usage = sys_info.global_cpu_info().cpu_usage();
+    let cpus_usage = sys_info.global_cpu_info().cpu_usage() / 100.0;
     cache.push(
         MetricName::CpusUsage,
         MetricPoint {
             timestamp,
-            value: cpus_usage as f64,
+            value: cpus_usage as f32,
         },
     );
 
     for (i, cpu) in sys_info.cpus().iter().enumerate() {
-        let usage = cpu.cpu_usage();
+        let usage = cpu.cpu_usage() / 100.0;
         cache.push(
             MetricName::CpuUsage { id: i },
             MetricPoint {
                 timestamp,
-                value: usage as f64,
+                value: usage as f32,
             },
         );
     }
@@ -48,7 +48,7 @@ pub fn sample_sys_info(
         MetricName::MemUsage,
         MetricPoint {
             timestamp,
-            value: mem_usage,
+            value: mem_usage as f32,
         },
     );
 
@@ -61,7 +61,7 @@ pub fn sample_sys_info(
             MetricName::NetTxUsage,
             MetricPoint {
                 timestamp,
-                value: tx_bytes as f64,
+                value: tx_bytes as f32,
             },
         );
 
@@ -70,7 +70,7 @@ pub fn sample_sys_info(
             MetricName::NetRxUsage,
             MetricPoint {
                 timestamp,
-                value: rx_bytes as f64,
+                value: rx_bytes as f32,
             },
         );
         break;

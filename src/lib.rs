@@ -9,7 +9,7 @@ pub mod metrics;
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MetricPoint {
     pub timestamp: u64,
-    pub value: f64,
+    pub value: f32,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
