@@ -38,7 +38,7 @@ async fn main() {
         tokio::spawn(async move {
             loop {
                 metrics::sample_sys_info(&cache, &mut sys_info, &config.ethernet_name);
-                tokio::time::sleep(time::Duration::from_secs(5)).await;
+                tokio::time::sleep(time::Duration::from_secs(config.sample_interval_s)).await;
             }
         });
     }
@@ -81,6 +81,7 @@ pub struct Config {
     pub listen_addr: String,
     pub shard_count: usize,
     pub ring_size: usize,
+    pub sample_interval_s: u64,
     pub ethernet_name: String,
     pub api_tokens: Vec<ApiToken>,
 }
