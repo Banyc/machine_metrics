@@ -1,0 +1,6 @@
+shard_count = 4
+ring_size = 1024
+ethernet_name = "en0"
+api_tokens = [
+    { description = "unsafe token", token = "unsafe" },
+]
