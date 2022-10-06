@@ -16,15 +16,7 @@ use serde::Deserialize;
 async fn main() {
     env_logger::try_init().unwrap();
 
-    let config_path = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "config/config.toml".to_string());
-    let config: Config = {
-        let mut config_file = File::open(config_path).unwrap();
-        let mut config = String::new();
-        config_file.read_to_string(&mut config).unwrap();
-        toml::from_str(&config).unwrap()
-    };
+    let config = get_config();
 
     let cache = MetricCache::new(config.shard_count, config.ring_size);
     let cache = Arc::new(cache);
@@ -32,16 +24,7 @@ async fn main() {
     let api_tokens = HashSet::from_iter(config.api_tokens.iter().map(|x| x.token.clone()));
     let api_tokens = Arc::new(api_tokens);
 
-    let mut sys_info = metrics::get_new_sys_info();
-    {
-        let cache = Arc::clone(&cache);
-        tokio::spawn(async move {
-            loop {
-                metrics::sample_sys_info(&cache, &mut sys_info, &config.ethernet_name);
-                tokio::time::sleep(time::Duration::from_secs(config.sample_interval_s)).await;
-            }
-        });
-    }
+    start_sampling_machine_metrics(&config, &cache);
 
     let api_token_required = Router::new()
         .route(
@@ -68,6 +51,31 @@ async fn main() {
         .serve(app.into_make_service())
         .await
         .unwrap();
+}
+
+fn get_config() -> Config {
+    let config_path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "config/config.toml".to_string());
+    let mut config_file = File::open(config_path).unwrap();
+    let mut config = String::new();
+    config_file.read_to_string(&mut config).unwrap();
+    toml::from_str(&config).unwrap()
+}
+
+fn start_sampling_machine_metrics(config: &Config, cache: &Arc<MetricCache>) {
+    let mut sys_info = metrics::get_new_sys_info();
+
+    let ethernet_interface_name = config.ethernet_name.clone();
+    let sample_interval_s = config.sample_interval_s;
+    let cache = Arc::clone(&cache);
+
+    tokio::spawn(async move {
+        loop {
+            metrics::sample_sys_info(&cache, &mut sys_info, &ethernet_interface_name);
+            tokio::time::sleep(time::Duration::from_secs(sample_interval_s)).await;
+        }
+    });
 }
 
 #[derive(Debug, Deserialize)]
