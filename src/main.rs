@@ -14,7 +14,7 @@ use serde::Deserialize;
 
 #[tokio::main]
 async fn main() {
-    env_logger::try_init().unwrap();
+    let _ = env_logger::try_init();
 
     let config = get_config();
 
