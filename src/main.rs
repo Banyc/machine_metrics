@@ -11,6 +11,7 @@ use axum::{middleware, routing::post, Json, Router};
 use log::info;
 use machine_metrics::{api, metrics, MetricCache};
 use serde::Deserialize;
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() {
@@ -33,7 +34,13 @@ async fn main() {
         )
         .layer(middleware::from_fn(move |req, next| {
             api::api_token_auth(req, next, Arc::clone(&api_tokens))
-        }));
+        }))
+        .layer(
+            CorsLayer::new()
+                .allow_headers(Any)
+                .allow_methods(Any)
+                .allow_origin(Any),
+        );
 
     // build our application
     let app = Router::new().nest("/api_token", api_token_required);
