@@ -1,6 +1,6 @@
-use std::{sync::Arc, time};
+use std::{collections::HashMap, sync::Arc, time};
 
-use crate::{MetricCache, MetricName, MetricPoint};
+use crate::{MetricCache, MetricName, MetricPoint, MetricsRequest, MetricsResponse};
 use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
 
 pub fn get_new_sys_info() -> System {
@@ -75,4 +75,34 @@ pub fn sample_sys_info(
         );
         break;
     }
+}
+
+pub fn get_machine_metrics(req: MetricsRequest, cache: Arc<MetricCache>) -> MetricsResponse {
+    let mut resp = MetricsResponse {
+        cpu: HashMap::new(),
+        cpus: cache
+            .clone_batch_last(&MetricName::CpusUsage, req.each_count)
+            .map_or(vec![], |v| v),
+        mem: cache
+            .clone_batch_last(&MetricName::MemUsage, req.each_count)
+            .map_or(vec![], |v| v),
+        net_tx: cache
+            .clone_batch_last(&MetricName::NetTxUsage, req.each_count)
+            .map_or(vec![], |v| v),
+        net_rx: cache
+            .clone_batch_last(&MetricName::NetRxUsage, req.each_count)
+            .map_or(vec![], |v| v),
+    };
+
+    let mut id = 0;
+    loop {
+        let metrics = match cache.clone_batch_last(&MetricName::CpuUsage { id }, req.each_count) {
+            Some(metrics) => metrics,
+            None => break,
+        };
+        resp.cpu.insert(id, metrics);
+        id = id + 1;
+    }
+
+    resp
 }

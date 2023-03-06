@@ -1,9 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 
-use crate::{MetricCache, MetricName, MetricsRequest, MetricsResponse};
+use crate::{MetricCache, MetricsRequest};
 use axum::{
     http::{Request, StatusCode},
     middleware::Next,
@@ -34,31 +31,6 @@ pub async fn get_machine_metrics(
     req: MetricsRequest,
     cache: Arc<MetricCache>,
 ) -> impl IntoResponse {
-    let mut resp = MetricsResponse {
-        cpu: HashMap::new(),
-        cpus: cache
-            .clone_batch_last(&MetricName::CpusUsage, req.each_count)
-            .map_or(vec![], |v| v),
-        mem: cache
-            .clone_batch_last(&MetricName::MemUsage, req.each_count)
-            .map_or(vec![], |v| v),
-        net_tx: cache
-            .clone_batch_last(&MetricName::NetTxUsage, req.each_count)
-            .map_or(vec![], |v| v),
-        net_rx: cache
-            .clone_batch_last(&MetricName::NetRxUsage, req.each_count)
-            .map_or(vec![], |v| v),
-    };
-
-    let mut id = 0;
-    loop {
-        let metrics = match cache.clone_batch_last(&MetricName::CpuUsage { id }, req.each_count) {
-            Some(metrics) => metrics,
-            None => break,
-        };
-        resp.cpu.insert(id, metrics);
-        id = id + 1;
-    }
-
+    let resp = crate::metrics::get_machine_metrics(req, cache);
     Json(resp)
 }
