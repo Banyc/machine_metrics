@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Arc, time};
 
-use crate::{MetricCache, MetricName, MetricPoint, MetricsRequest, MetricsResponse};
+use cncr_k_ltd_ring::CncrKLtdRing;
+use serde::{Deserialize, Serialize};
 use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
 
 pub fn get_new_sys_info() -> System {
@@ -105,4 +106,35 @@ pub fn get_machine_metrics(req: MetricsRequest, cache: Arc<MetricCache>) -> Metr
     }
 
     resp
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MetricPoint {
+    pub timestamp: u64,
+    pub value: f32,
+}
+
+#[derive(Debug, Eq, PartialEq, Hash)]
+pub enum MetricName {
+    CpusUsage,
+    CpuUsage { id: usize },
+    MemUsage,
+    NetTxUsage,
+    NetRxUsage,
+}
+
+pub type MetricCache = CncrKLtdRing<MetricName, MetricPoint>;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MetricsRequest {
+    pub each_count: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MetricsResponse {
+    pub cpus: Vec<MetricPoint>,
+    pub cpu: HashMap<usize, Vec<MetricPoint>>,
+    pub mem: Vec<MetricPoint>,
+    pub net_tx: Vec<MetricPoint>,
+    pub net_rx: Vec<MetricPoint>,
 }

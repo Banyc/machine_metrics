@@ -1,12 +1,12 @@
 use std::{collections::HashSet, sync::Arc};
 
-use crate::{MetricCache, MetricsRequest};
 use axum::{
     http::{Request, StatusCode},
     middleware::Next,
     response::IntoResponse,
     Json,
 };
+use machine_metrics::{metrics::MetricsRequest, MachineMetrics};
 
 pub async fn api_token_auth<B>(
     req: Request<B>,
@@ -28,9 +28,9 @@ pub async fn api_token_auth<B>(
 }
 
 pub async fn get_machine_metrics(
-    req: MetricsRequest,
-    cache: Arc<MetricCache>,
+    Json(req): Json<MetricsRequest>,
+    machine_metrics: Arc<MachineMetrics>,
 ) -> impl IntoResponse {
-    let resp = crate::metrics::get_machine_metrics(req, cache);
+    let resp = machine_metrics.get_machine_metrics(req);
     Json(resp)
 }
