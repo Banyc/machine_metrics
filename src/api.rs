@@ -6,7 +6,10 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use machine_metrics::{metrics::MetricsRequest, MachineMetrics};
+use machine_metrics::{
+    metrics::{MetricsAllRequest, MetricsRequest},
+    MachineMetrics,
+};
 
 pub async fn api_token_auth<B>(
     req: Request<B>,
@@ -25,6 +28,14 @@ pub async fn api_token_auth<B>(
         }
     }
     (StatusCode::UNAUTHORIZED, "Unauthorized").into_response()
+}
+
+pub async fn get_machine_metrics_all(
+    Json(req): Json<MetricsAllRequest>,
+    machine_metrics: Arc<MachineMetrics>,
+) -> impl IntoResponse {
+    let resp = machine_metrics.get_machine_metrics_all(req);
+    Json(resp)
 }
 
 pub async fn get_machine_metrics(

@@ -28,6 +28,13 @@ async fn main() {
 
     let api_token_required = Router::new()
         .route(
+            "/get_machine_metrics_all/v1",
+            post({
+                let machine_metrics = Arc::clone(&machine_metrics);
+                move |req| api::get_machine_metrics_all(req, machine_metrics)
+            }),
+        )
+        .route(
             "/get_machine_metrics/v1",
             post({
                 let machine_metrics = Arc::clone(&machine_metrics);

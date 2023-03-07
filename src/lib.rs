@@ -1,6 +1,8 @@
 use std::{sync::Arc, time};
 
-use metrics::{MetricCache, MetricsRequest, MetricsResponse};
+use metrics::{
+    MetricCache, MetricsAllRequest, MetricsAllResponse, MetricsRequest, MetricsResponse,
+};
 use serde::Deserialize;
 
 // pub mod api;
@@ -18,6 +20,10 @@ impl MachineMetrics {
         start_sampling_machine_metrics(&config, &cache);
 
         Self { cache }
+    }
+
+    pub fn get_machine_metrics_all(&self, req: MetricsAllRequest) -> MetricsAllResponse {
+        metrics::get_machine_metrics_all(req, self.cache.clone())
     }
 
     pub fn get_machine_metrics(&self, req: MetricsRequest) -> MetricsResponse {

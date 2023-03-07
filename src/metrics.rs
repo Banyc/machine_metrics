@@ -78,8 +78,11 @@ pub fn sample_sys_info(
     }
 }
 
-pub fn get_machine_metrics(req: MetricsRequest, cache: Arc<MetricCache>) -> MetricsResponse {
-    let mut resp = MetricsResponse {
+pub fn get_machine_metrics_all(
+    req: MetricsAllRequest,
+    cache: Arc<MetricCache>,
+) -> MetricsAllResponse {
+    let mut resp = MetricsAllResponse {
         cpu: HashMap::new(),
         cpus: cache
             .clone_batch_last(&MetricName::CpusUsage, req.each_count)
@@ -108,13 +111,27 @@ pub fn get_machine_metrics(req: MetricsRequest, cache: Arc<MetricCache>) -> Metr
     resp
 }
 
+pub fn get_machine_metrics(req: MetricsRequest, cache: Arc<MetricCache>) -> MetricsResponse {
+    let mut data = Vec::new();
+
+    for item in req.0 {
+        let metrics = cache
+            .clone_batch_last(&item.name, item.count)
+            .map_or(vec![], |v| v);
+        data.push(metrics);
+    }
+
+    MetricsResponse(data)
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MetricPoint {
     pub timestamp: u64,
     pub value: f32,
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum MetricName {
     CpusUsage,
     CpuUsage { id: usize },
@@ -126,15 +143,27 @@ pub enum MetricName {
 pub type MetricCache = CncrKLtdRing<MetricName, MetricPoint>;
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct MetricsRequest {
+pub struct MetricsAllRequest {
     pub each_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct MetricsResponse {
+pub struct MetricsAllResponse {
     pub cpus: Vec<MetricPoint>,
     pub cpu: HashMap<usize, Vec<MetricPoint>>,
     pub mem: Vec<MetricPoint>,
     pub net_tx: Vec<MetricPoint>,
     pub net_rx: Vec<MetricPoint>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MetricsRequest(pub Vec<MetricsRequestItem>);
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MetricsRequestItem {
+    pub count: usize,
+    pub name: MetricName,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MetricsResponse(pub Vec<Vec<MetricPoint>>);
