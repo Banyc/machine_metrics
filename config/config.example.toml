@@ -5,4 +5,3 @@ api_tokens = [{ description = "unsafe token", token = "unsafe" }]
 shard_count = 4
 ring_size = 1024
 sample_interval_s = 10
-ethernet_name = "en0"

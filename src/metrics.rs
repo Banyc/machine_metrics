@@ -10,11 +10,7 @@ pub fn get_new_sys_info() -> System {
     sys_info
 }
 
-pub fn sample_sys_info(
-    cache: &Arc<MetricCache>,
-    sys_info: &mut System,
-    ethernet_interface_name: &str,
-) {
+pub fn sample_sys_info(last_timestamp: &mut u64, cache: &Arc<MetricCache>, sys_info: &mut System) {
     sys_info.refresh_cpu();
     sys_info.refresh_memory();
     sys_info.refresh_networks();
@@ -53,29 +49,32 @@ pub fn sample_sys_info(
         },
     );
 
-    for (interface_name, data) in sys_info.networks() {
-        if interface_name != ethernet_interface_name {
-            continue;
-        }
-        let tx_bytes = data.transmitted();
+    // Network
+    let mut tx_bytes = 0;
+    let mut rx_bytes = 0;
+    for (_interface_name, data) in sys_info.networks() {
+        tx_bytes += data.transmitted();
+        rx_bytes += data.received();
+    }
+    let duration_s = timestamp - *last_timestamp;
+    if duration_s > 0 {
         cache.push(
             MetricName::NetTxUsage,
             MetricPoint {
                 timestamp,
-                value: tx_bytes as f32,
+                value: tx_bytes as f32 / duration_s as f32,
             },
         );
-
-        let rx_bytes = data.received();
         cache.push(
             MetricName::NetRxUsage,
             MetricPoint {
                 timestamp,
-                value: rx_bytes as f32,
+                value: rx_bytes as f32 / duration_s as f32,
             },
         );
-        break;
     }
+
+    *last_timestamp = timestamp;
 }
 
 pub fn get_machine_metrics_all(

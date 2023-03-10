@@ -36,19 +36,21 @@ pub struct MachineMetricsConfig {
     pub shard_count: usize,
     pub ring_size: usize,
     pub sample_interval_s: u64,
-    pub ethernet_name: String,
 }
 
 fn start_sampling_machine_metrics(config: &MachineMetricsConfig, cache: &Arc<MetricCache>) {
     let mut sys_info = metrics::get_new_sys_info();
+    let mut last_timestamp = time::SystemTime::now()
+        .duration_since(time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
 
-    let ethernet_interface_name = config.ethernet_name.clone();
     let sample_interval_s = config.sample_interval_s;
     let cache = Arc::clone(&cache);
 
     tokio::spawn(async move {
         loop {
-            metrics::sample_sys_info(&cache, &mut sys_info, &ethernet_interface_name);
+            metrics::sample_sys_info(&mut last_timestamp, &cache, &mut sys_info);
             tokio::time::sleep(time::Duration::from_secs(sample_interval_s)).await;
         }
     });
