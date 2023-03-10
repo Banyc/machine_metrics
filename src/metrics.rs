@@ -21,33 +21,40 @@ pub fn sample_sys_info(last_timestamp: &mut u64, cache: &Arc<MetricCache>, sys_i
         .as_secs();
 
     let cpus_usage = sys_info.global_cpu_info().cpu_usage() / 100.0;
-    cache.push(
-        MetricName::CpusUsage,
-        MetricPoint {
-            timestamp,
-            value: cpus_usage as f32,
-        },
-    );
-
-    for (i, cpu) in sys_info.cpus().iter().enumerate() {
-        let usage = cpu.cpu_usage() / 100.0;
+    if cpus_usage.is_finite() {
         cache.push(
-            MetricName::CpuUsage { id: i },
+            MetricName::CpusUsage,
             MetricPoint {
                 timestamp,
-                value: usage as f32,
+                value: cpus_usage as f32,
             },
         );
     }
 
-    let mem_usage = sys_info.used_memory() as f64 / sys_info.total_memory() as f64;
-    cache.push(
-        MetricName::MemUsage,
-        MetricPoint {
-            timestamp,
-            value: mem_usage as f32,
-        },
-    );
+    for (i, cpu) in sys_info.cpus().iter().enumerate() {
+        let usage = cpu.cpu_usage() / 100.0;
+        if usage.is_finite() {
+            cache.push(
+                MetricName::CpuUsage { id: i },
+                MetricPoint {
+                    timestamp,
+                    value: usage as f32,
+                },
+            );
+        }
+    }
+
+    let total_memory = sys_info.total_memory();
+    if total_memory > 0 {
+        let mem_usage = sys_info.used_memory() as f64 / total_memory as f64;
+        cache.push(
+            MetricName::MemUsage,
+            MetricPoint {
+                timestamp,
+                value: mem_usage as f32,
+            },
+        );
+    }
 
     // Network
     let mut tx_bytes = 0;
