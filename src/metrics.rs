@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc, time};
 
-use cncr_k_ltd_ring::CncrKLtdRing;
+use cncr_k_ring::CncrKLtdRing;
 use serde::{Deserialize, Serialize};
 use sysinfo::{CpuExt, NetworkExt, System, SystemExt};
 

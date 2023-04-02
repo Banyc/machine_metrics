@@ -7,8 +7,8 @@ edition = "2021"
 
 [dependencies]
 sysinfo = "0.28.4"
-cncr_k_ltd_ring = { git = "https://github.com/Banyc/cncr_k_ltd_ring" }
-tokio = "1.27.0"
+cncr_k_ring = "0.1.0"
+tokio = { version = "1.27.0", features = ["rt", "time"] }
 log = "0.4.17"
 serde = { version = "1.0.159", features = ["derive"] }
 
