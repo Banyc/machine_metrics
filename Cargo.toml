@@ -6,11 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-sysinfo = "0.28.2"
+sysinfo = "0.28.4"
 cncr_k_ltd_ring = { git = "https://github.com/Banyc/cncr_k_ltd_ring" }
-tokio = "1.26.0"
+tokio = "1.27.0"
 log = "0.4.17"
-serde = { version = "1.0.152", features = ["derive"] }
+serde = { version = "1.0.159", features = ["derive"] }
 
 [workspace]
 members = ["server"]
